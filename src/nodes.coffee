@@ -149,6 +149,40 @@ class If
     else
       @anchor
 
+class Case
+  constructor: (@ast, @document, @model, @controller) ->
+    @anchor = document.createTextNode('')
+    @model.bind? "change:#{@ast.arguments[0]}", @build
+
+  build: =>
+    if @ast.arguments.length > 1 && String(get(@model, @ast.arguments[0])) == @ast.arguments[1]
+      @nodes ||= (Nodes.compile(child, @document, @model, @controller) for child in @ast.children)
+      node.insertAfter(@nodes[i-1]?.lastElement() or @anchor) for node, i in @nodes
+    else
+      @removeNodes()
+
+  append: (inside) ->
+    inside.appendChild(@anchor)
+    @build()
+
+  insertAfter: (after) ->
+    after.parentNode.insertBefore(@anchor, after.nextSibling)
+    @build()
+
+  remove: ->
+    @removeNodes()
+    @anchor.parentNode.removeChild(@anchor)
+
+  removeNodes: ->
+    node.remove() for node in @nodes if @nodes
+    @nodes = undefined
+
+  lastElement: ->
+    if @nodes?.length
+      @nodes[@nodes.length - 1].lastElement()
+    else
+      @anchor
+      
 class In
   constructor: (@ast, @document, @model, @controller) ->
     @anchor = document.createTextNode('')
@@ -279,6 +313,7 @@ Nodes =
           when "view" then new View(ast, document, model, controller)
           when "collection" then new Collection(ast, document, model, controller)
           when "if" then new If(ast, document, model, controller)
+          when "case" then new Case(ast, document, model, controller)
           when "in" then new In(ast, document, model, controller)
           else new Helper(ast, document, model, controller)
       else throw SyntaxError "unknown type '#{ast.type}'"
